@@ -1,42 +1,31 @@
 % Load Image
-image = imread('shoes.jpg');
+image = imread('car.jpg');
 image = imresize(image, [512 512]);
-
 %-----------------------------------------------------------------------
 % Convert to HSV and YCbCr color spaces
 image_hsv = rgb2hsv(image);
 image_ycbcr = rgb2ycbcr(image);
 
-% Thresholding in HSV
+% Thresholding in HSV (example: isolating red regions)
 hue = image_hsv(:,:,1);
 sat = image_hsv(:,:,2);
 val = image_hsv(:,:,3);
-cutoff_row = round(size(image, 1) * 0.75);
 
-% Brown color segmentation (tuned for shoe color)
-red_mask = (hue > 0.02 & hue < 0.18) & sat > 0.2 & val > 0.0001; % Adjusted thresholds for brown shoes
-red_mask(cutoff_row:end, :) = 0; % Set lower part to black
+% Shadow Detection based on lower brightness and saturation thresholds
+shadow_mask = (sat < 0.7) & (val < 0.3); % Adjust thresholds as necessary
 
-% Black color segmentation (for pants and socks)
-pants_mask = val < 0.25; % Adjust threshold as needed - increased slightly
-pants_mask(cutoff_row:end, :) = 0; % Set lower part to black
+% Object Detection based on higher brightness and saturation thresholds
+object_mask = (sat > 0.7) & (val > 0.3); % Adjust thresholds as necessary
 
-% Combine the masks for the Region Segmentation subplot
-combined_mask = red_mask | pants_mask;
+red_mask = (hue > 0.10 | hue < 0.90) & sat > 0.2 & val > 0.1; % Adjust thresholds as needed
 
+% Morphological Processing to refine masks
+se = strel('disk', 5); % Structuring element for morphological operations
+shadow_mask = imclose(shadow_mask, se); % Close gaps in shadow regions
+shadow_mask = imfill(shadow_mask, 'holes'); % Fill holes in shadow regions
 
-% Morphological Processing to refine the red mask (focus on shoe shape)
-se = strel('disk', 10); % Larger disk for closing gaps
-red_mask = imclose(red_mask, se); % Close gaps in shoe regions
-red_mask = imfill(red_mask, 'holes'); % Fill holes in shoe regions
-se2 = strel('disk', 5);
-red_mask = imerode(red_mask, se2); % Erode to separate close objects
-
-% Shadow Detection (adjusted thresholds for shoe image)
-shadow_mask = (sat < 0.4) & (val < 0.4); % Adjusted thresholds
-
-% Object Detection (adjusted thresholds for shoe image)
-object_mask = (sat > 0.3) & (val > 0.4); % Adjusted thresholds
+object_mask = imclose(object_mask, se); % Close gaps in object regions
+object_mask = imfill(object_mask, 'holes'); % Fill holes in object regions
 
 % Overlay masks on original image for visualization
 shadow_overlay = labeloverlay(image, shadow_mask, 'Colormap', [0 0 1], 'Transparency', 0.6); % Blue for shadows
@@ -57,14 +46,17 @@ num_clusters = 3; % Number of clusters
 
 [idx, cluster_centers] = kmeans(pixels, num_clusters);
 
-% Connected component analysis on the red mask
+% Reshape back to image dimensions
+segmented_image = reshape(idx, size(image,1), size(image,2));
+
+% Connected component analysis on red mask (from color segmentation)
 connected_components = bwconncomp(red_mask);
 
 % Extract region properties (centroid, area, bounding box)
 stats = regionprops(connected_components, 'Centroid', 'Area', 'BoundingBox');
 
 % Overlay segmentation output on original image
-overlay_image = labeloverlay(image, red_mask);
+overlay_image = labeloverlay(image, segmented_image);
 
 % Create a figure with multiple subplots
 figure;
@@ -74,10 +66,10 @@ subplot(3,4,1);
 imshow(image);
 title('Original Image');
 
-% Subplot 2: Brown and Black Segmentation (Pants and Shoes)
+% Subplot 2: Regions Segmentation
 subplot(3,4,2);
-imshow(combined_mask);
-title('Brown and Black Segmentation (Pants and Shoes)');
+imshow(red_mask);
+title('Regions Segmentation');
 
 % Subplot 3: Enhanced Edges
 subplot(3,4,3);
@@ -94,8 +86,8 @@ subplot(3,4,5);
 imshow(image); hold on;
 
 % Set minimum and maximum area thresholds for bounding boxes
-min_area = 1000;  % Adjusted based on shoe size in the image
-max_area = 50000; % Adjusted based on shoe size in the image
+min_area = 5000;  % Adjust based on your requirements
+max_area = 100000; % Adjust based on your requirements
 
 for i = 1:length(stats)
     % Calculate the area of the bounding box (width * height)
@@ -110,10 +102,11 @@ end
 title('Object Detection with Bounding Boxes');
 hold off;
 
+
 % Subplot 6: Segmentation Overlay
 subplot(3,4,6);
 imshow(overlay_image);
-title('Segmentation Overlay (Shoes Only)');
+title('Segmentation Overlay');
 
 % Subplot 7: Canny Edges
 subplot(3,4,7);
@@ -130,9 +123,16 @@ subplot(3,4,9);
 imshow(ycbcr2rgb(image_ycbcr));
 title('YCbCr Image');
 
+% Subplot 5.1: Combined Overlay (Shadows and Objects)
+combined_overlay = labeloverlay(image, shadow_mask | object_mask, ...
+                                'Colormap', [1 0 0; 0 0 1], 'Transparency', 0.6);
+subplot(3,4,10);
+imshow(combined_overlay);
+title('Combined Overlay (Shadows and Objects)');
+
 % Subplot for segmented object
-min_area = 1000;  % Adjusted based on shoe size in the image
-max_area = 50000; % Adjusted based on shoe size in the image
+min_area = 5000;  % Adjust based on your requirements
+max_area = 100000; % Adjust based on your requirements
 
 % Compute the negative of the image
 negative_image = 255 - image;
@@ -168,6 +168,6 @@ for i = 1:length(stats)
     end
 end
 
-subplot(3,4,10);
+subplot(3,4,11);
 imshow(colored_image);
-title('Segmented Object with Changed Color (Shoes Only)');
+title('Segmented Object with Changed Color');
