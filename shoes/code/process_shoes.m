@@ -189,6 +189,8 @@ end
 title('Object Detection with Bounding Boxes');
 hold off;
 
+segmented_image_rgb = label2rgb(segmented_image, 'jet', 'k', 'shuffle');
+
 % Save the new figure
 saveas(gcf, 'shoes_object_detection_with_bounding_boxes.jpg');
 

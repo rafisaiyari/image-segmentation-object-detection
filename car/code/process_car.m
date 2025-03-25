@@ -186,10 +186,12 @@ end
 title('Object Detection with Bounding Boxes');
 hold off;
 
+segmented_image_rgb = label2rgb(segmented_image, 'jet', 'k', 'shuffle');
+
 % Write the output
 saveas(gcf, 'car_object_detection_with_bounding_boxes.jpg');
 imwrite(image, 'car_original_image.jpg');
-imwrite(combined_mask, 'car_brown_black_segmentation.jpg');
+imwrite(red_mask, 'car_red_segmentation.jpg');
 imwrite(edges_dilated, 'car_enhanced_edges.jpg');
 imwrite(segmented_image_rgb, 'car_kmeans_segmentation.jpg'); 
 imwrite(combined_overlay, 'car_shadow_and_car_segmentation.jpg');
